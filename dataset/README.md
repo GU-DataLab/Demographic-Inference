@@ -1,0 +1,1 @@
+This dataset is used for demographic inference. Beginning with a public data set containing the demographic information of actors and actresses in IMDB, we use different celebrity lists to scrape the Twitter handles of different celebrities.. Due to Twitter's privacy policy, we can not provide the tweets. But you can easily download them using Twitter API.
