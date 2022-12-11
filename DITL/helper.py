@@ -29,7 +29,15 @@ def check_early(vals_early, flag=8):
             return i
     return None
 
-
+def get_remain_handles(path="/home/yaguang/new_nonstop_onefeaturesword1.csv", sep = "\x1b"):
+    f = open(path)
+    f.readline()
+    handles = set()
+    for line in f:
+        line = line.strip()
+        handle = line.split(sep)[0]
+        handles.add(handle)
+    return handles
 
 class MyMLP(nn.Module):
     def __init__(self, D_in, H, D_out, bin_label=False):

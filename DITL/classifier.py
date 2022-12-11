@@ -5,7 +5,6 @@ import lmdb
 import time
 import pickle
 import torch
-import collections
 import numpy as np
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
@@ -19,9 +18,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_sequence
 from helper import SeqAttention, check_early
-from helper import map_handle_gt
-from helper import to_cuda, to_float_cuda, to_self_cuda, under_sample, get_files_under_dir
-from text_char_processing import get_tweet_texts
+from helper import to_cuda, to_float_cuda, to_self_cuda, under_sample, get_remain_handles, map_handle_gt, get_files_under_dir
 import os
 import argparse, sys
 
@@ -41,6 +38,9 @@ fix_seq_len = int(args.fix_seq_len)
 dev = "cuda"
 device = torch.device(dev) if torch.cuda.is_available() else torch.device("cpu")
 
+class DataProcessType:
+    more_20_tweets = "more_20_tweets"
+    all_tweets = "all_tweets"
 
 class InferenceType:
     age = "age"
@@ -52,12 +52,18 @@ class BinType:
     three = "three"
     four = "four"
 
-def map_gender_to_label(handle, genders):
+def map_race_to_label(handle):
+    if handle not in races:
+        return -1
+    val = 1 if races[handle] == "black" else 0
+    return val
+
+def map_gender_to_label(handle):
     if handle not in genders:
         return -1
-    if genders[handle] in ["Female", "female"]:
+    if genders[handle] == "female":
         val = 1
-    elif genders[handle] in ["Male", "male"]:
+    elif genders[handle] == "male":
         val = 0
     else:
         val = -1
@@ -69,19 +75,19 @@ def map_num_to_label(num, category):
             return i
     return len(category)-1
 
-def map_age_to_label(handle, ages):
+def map_age_to_label(handle):
     if handle not in ages:
         return -1
     val = map_num_to_label(ages[handle], bins)
     return val
 
 # create an index to associate user handle with a counter for 10-fold cross validation prupose
-def map_index_to_file_label(onlyfiles, att):
+def map_index_to_file_label(onlyfiles):
     index_file = {}
     count = 0
     for filename in onlyfiles:
         handle = filename[:-4].lower()
-        val = map_attribute(handle, att)
+        val = map_attribute(handle)
         if val == -1:
             continue
         index_file[count] = (filename, val)
@@ -97,198 +103,114 @@ def get_index_label(index_to_file_label):
     index, labels = np.array(index), np.array(labels)
     return index, labels
 
-# get training data and label information
-def get_train_label(batch_train_names, txn, att, idx):
-    X_batch_train = []
-    y_batch_train = []
-    y_gt = []
-    seq_lens = []
-    counter = [0, 0, 0 ,0]
-    for i in range(len(batch_train_names)):
-        handle = batch_train_names[i][:-4].lower()
-        pick_emd = txn.get(handle.encode())
-        temp = pickle.loads(pick_emd)[:fix_seq_len]
-        tweet_emb = [val[idx:] for val in temp]
-        seq_lens.append(len(tweet_emb))
-        while len(tweet_emb) < fix_seq_len:
-            tweet_emb.append([0 for i in range(input_dim)])
-        X_batch_train.append(tweet_emb)
-        val = map_attribute(handle, att)
-        y_batch_train.append(val)
-        y_gt.append(val)
-        counter[map_attribute(handle, att)] += 1
-    #print (counter)
-    X_batch_train = to_float_cuda(X_batch_train, device)
-    X_batch_train = X_batch_train.permute(1, 0, 2)
-    y_batch_train = to_float_cuda(y_batch_train, device).reshape(-1, 1) if inference_type != InferenceType.age else to_self_cuda(y_batch_train, device)
-    return X_batch_train, y_batch_train, y_gt, seq_lens
-
-def tensor2list(vals):
-    y_hat_test_class = []
-    if inference_type == InferenceType.age:
-        target = np.argmax(vals.cpu().detach().numpy(), axis=1)
-        for i in range(len(target)):
-            y_hat_test_class.append(target[i])
-    else:
-        target = np.where(vals.cpu().detach().numpy()<0.5, 0, 1)
-        for i in range(len(target)):
-            y_hat_test_class.append(target[i][0])
-    return y_hat_test_class
-
-def train_model(model, imdb_train_names, imdb_test_names, imdb_val_names, wiki_train_names, wiki_test_names, wiki_val_names):
+def train_model(model, train_names, test_names, val_names):
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = nn.CrossEntropyLoss() if inference_type == InferenceType.age else nn.BCELoss()
     vals_early = []
     for epoch in range(epochs):
-        y_hat_test = []
-        y_test = []
         total = 0
         idx = 0
         counter = [0, 0, 0 ,0 ,0]
-        imdb_train_names = random.sample(imdb_train_names, len(imdb_train_names))
-        wiki_train_names = random.sample(wiki_train_names, len(wiki_train_names))
-        while idx < len(imdb_train_names):
+        #model.train()
+        train_names = random.sample(train_names, len(train_names))
+        while idx < len(train_names):
             model.train()
-
-            imdb_batch_train_names = imdb_train_names[idx:idx+batch_size]
-            imdb_X_batch_train, imdb_y_batch_train, imdb_y_gt, imdb_seq_lens = get_train_label(imdb_batch_train_names, txn_imdb, gt_imdb, 1)
-
-            wiki_batch_train_names = wiki_train_names[idx:idx+batch_size]
-            wiki_X_batch_train, wiki_y_batch_train, wiki_y_gt, wiki_seq_lens = get_train_label(wiki_batch_train_names, txn_wiki, gt_wiki, 2)
-
-            y_pred = model(None, imdb_X_batch_train, imdb_seq_lens)
-            imdb_loss = loss_fn(y_pred, imdb_y_batch_train)
-            y_hat_test += tensor2list(y_pred)
-            y_test += imdb_y_gt
-
-            y_pred = model(None, wiki_X_batch_train, wiki_seq_lens)
-            wiki_loss = loss_fn(y_pred, wiki_y_batch_train)
-
-            loss = sum([imdb_loss, lam*wiki_loss])
+            batch_train_names = train_names[idx:idx+batch_size]
+            X_batch_train = []
+            y_batch_train = []
+            seq_lens = []
+            end_time = time.time()
+            for i in range(len(batch_train_names)):
+                handle = batch_train_names[i][:-4].lower()
+                pick_emd = txn.get(handle.encode())
+                temp = pickle.loads(pick_emd)[:fix_seq_len]
+                tweet_emb = [val[2:] for val in temp]
+                seq_lens.append(len(tweet_emb))
+                while len(tweet_emb) < fix_seq_len:
+                    tweet_emb.append([0 for i in range(input_dim)])
+                X_batch_train.append(tweet_emb)
+                val = map_attribute(handle)
+                y_batch_train.append(val)
+                counter[map_attribute(handle)] += 1
+            X_batch_train = to_float_cuda(X_batch_train, device)
+            X_batch_train = X_batch_train.permute(1, 0, 2)
+            y_batch_train = to_float_cuda(y_batch_train, device).reshape(-1, 1) if inference_type != InferenceType.age else to_self_cuda(y_batch_train, device)
+            y_pred = model(None, X_batch_train, seq_lens)
+            loss = loss_fn(y_pred, y_batch_train)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
             optimizer.step()
             optimizer.zero_grad()
             idx += batch_size
             total += loss.item()
+        #torch.save(model, "saved_model/"+inference_type+"/"+str(total))
         print ("total train loss is "+str(total))
-        f1 = f1_score(y_test, y_hat_test, average='macro')
-        print ("train f1 is "+str(f1))
-        f1, loss_val = eval_model(model, imdb_val_names, wiki_val_names, True)
+        print ("print the loss and f1 for eval data")
+        f1, loss_val = eval_model(model, val_names)
         vals_early.append(loss_val)
-        f1, loss_val = eval_model(model, imdb_test_names, wiki_test_names)
+        print ("eval f1 is "+str(f1))
+        f1, loss_val = eval_model(model, test_names)
+        print ("test f1 is "+str(f1))
         print ("-------------")
         print ()
-        # early stopping
-        if check_early(vals_early) is not None:
+        if check_early(vals_early):
             break
     return loss.item()
 
-def eval_model(model, imdb_test_names, wiki_test_names, is_eval=False):
-    imdb_test_names = random.sample(imdb_test_names, len(imdb_test_names))
-    wiki_test_names = random.sample(wiki_test_names, len(wiki_test_names))
+def eval_model(model, test_names):
+    test_names = random.sample(test_names, len(test_names))
     idx = 0
     y_hat_test_class = []
     y_test = []
     loss_fn = nn.CrossEntropyLoss() if inference_type == InferenceType.age else nn.BCELoss()
     model.eval()
-    test_handles = []
     texts = []
     with torch.no_grad():
         total = 0
-        while idx < len(imdb_test_names):
-            imdb_batch_test_names = imdb_test_names[idx:idx+batch_size]
-            imdb_X_batch_test, imdb_y_eval_test, imdb_y_gt, imdb_seq_lens = get_train_label(imdb_batch_test_names, txn_imdb, gt_imdb, 1)
-            y_test += imdb_y_gt
-            imdb_y_hat_test = model(None, imdb_X_batch_test, imdb_seq_lens)
-            imdb_loss = loss_fn(imdb_y_hat_test, imdb_y_eval_test)
-
-            if is_eval:
-                wiki_batch_test_names = wiki_test_names[idx:idx+batch_size]
-                wiki_X_batch_test, wiki_y_eval_test, wiki_y_gt, wiki_seq_lens = get_train_label(wiki_batch_test_names, txn_wiki, gt_wiki, 2)
-                wiki_y_hat_test = model(None, wiki_X_batch_test, wiki_seq_lens)
-                wiki_loss = loss_fn(wiki_y_hat_test, wiki_y_eval_test)
-                loss = sum([imdb_loss, lam*wiki_loss])
-            else:
-                loss = imdb_loss
+        while idx < len(test_names):
+            y_eval_test = []
+            batch_test_names = test_names[idx:idx+batch_size]
+            X_batch_test = []
+            seq_lens = []
+            for i in range(len(batch_test_names)):
+                handle = batch_test_names[i][:-4].lower()
+                pick_emd = txn.get(handle.encode())
+                temp =  pickle.loads(pick_emd)[:fix_seq_len]
+                #tweet_emb = pickle.loads(txn.get(handle.encode()))[:fix_seq_len]
+                tweet_emb = [val[2:] for val in temp]
+                seq_lens.append(len(tweet_emb))
+                dates = [val[0] for val in temp][::-1]
+                while len(tweet_emb) < fix_seq_len:
+                    tweet_emb.append([0 for i in range(input_dim)])
+                X_batch_test.append(tweet_emb)
+                val = map_attribute(handle)
+                y_test.append(val)
+                y_eval_test.append(map_attribute(handle))
+            X_batch_test = to_float_cuda(X_batch_test, device)
+            X_batch_test = X_batch_test.permute(1, 0, 2)
+            #y_hat_test, weights = model(None, X_batch_test, seq_lens)
+            y_hat_test = model(None, X_batch_test, seq_lens)
+            #print (weights.shape)
+            y_eval_test = to_float_cuda(y_eval_test, device).reshape(-1, 1) if inference_type != InferenceType.age else to_self_cuda(y_eval_test, device)
+            loss = loss_fn(y_hat_test, y_eval_test)
+            #print ("eval loss is "+str(loss.item()))
             total += loss.item()
-            y_hat_test_class += tensor2list(imdb_y_hat_test)
+            if inference_type == InferenceType.age:
+                target = np.argmax(y_hat_test.cpu().detach().numpy(), axis=1)
+                for i in range(len(target)):
+                    y_hat_test_class.append(target[i])
+            else:
+                target = np.where(y_hat_test.cpu().detach().numpy()<0.5, 0, 1)
+                for i in range(len(target)):
+                    y_hat_test_class.append(target[i][0])
             idx += batch_size
+    print ("total eval loss is "+str(total))
     f1 = f1_score(y_test, y_hat_test_class, average='macro')
-    if not is_eval:
-        print ("total test loss is "+str(total))
-        print ("test f1 is "+str(f1))
-        print (",".join([name[:-4] for name in imdb_test_names]))
-        print (",".join([str(val) for val in y_test]))
-        print (",".join([str(val) for val in y_hat_test_class]))
-    else:
-        print ("total eval loss is "+str(total))
-        print ("eval f1 is "+str(f1))
-    #auc = roc_auc_score(y_test, y_hat_test_class )
     return f1, total
 
-# imdb ground truth
-def imdb_map_handle_gt():
-    ages = {}
-    genders = {}
-    f = open("/home/yaguang/imdb/age_ground_truth.csv")
-    f.readline()
-    for line in f:
-        info = line.strip().split(",")
-        name,age,gender,handle,verified = info
-        handle = handle.lower()
-        age = int(age)
-        ages[handle] = age
-        genders[handle] = gender
-    f.close()
-    return genders, ages
 
-def get_filenames(path):
-    filenames = []
-    f = open(path)
-    for line in f:
-        handle = line.strip().split(",")[0]
-        filenames.append(handle+".csv")
-    return filenames
-
-# get index for cross validation
-def get_index_labels(path, att):
-    onlyfiles = get_filenames(path)
-    index_to_file_label = map_index_to_file_label(onlyfiles, att)
-    counter = [0, 0, 0, 0]
-    index, labels = get_index_label(index_to_file_label)
-    for label in labels:
-        counter[label] += 1
-    counter = [0, 0, 0, 0]
-    index, labels = under_sample(index.reshape(-1, 1), labels)
-    index = index.ravel()
-    for label in labels:
-        counter[label] += 1
-    
-    return index, labels, index_to_file_label
-
-# split files into train, val and test
-def get_train_test_val_names(index, labels, index_to_file_label, train_index, test_index):
-    X_train_index, X_test_index = index[train_index], index[test_index]
-    y_train, y_test = labels[train_index], labels[test_index]
-    X_train_index, X_val_index, y_train, y_val = train_test_split(X_train_index, y_train, test_size=0.2, stratify=y_train, shuffle=True,random_state=0)
-    X_train_names = []
-    X_test_names = []
-    X_val_names = []
-    for idx in X_train_index:
-        X_train_names.append(index_to_file_label[idx][0])
-    for idx in X_test_index:
-        X_test_names.append(index_to_file_label[idx][0])
-    for idx in X_val_index:
-        X_val_names.append(index_to_file_label[idx][0])
-    return X_train_names, X_test_names, X_val_names
-
-
-env_imdb = lmdb.open('/data/lmdb/clip_imdb_3200/')
-env_wiki = lmdb.open('/data/lmdb/clip_text_3200/')
-txn_imdb = env_imdb.begin(write=False)
-txn_wiki = env_wiki.begin(write=False)
-
+# load embeddings
+env = lmdb.open('/data/lmdb/clip_text_3200/')
+txn = env.begin(write=False)
 
 if inference_type == InferenceType.gender:
     map_attribute = map_gender_to_label
@@ -308,53 +230,52 @@ else:
 
 D_out = len(bins) if inference_type == InferenceType.age else 1
 bin_classification = True if inference_type == InferenceType.gender else False
+
+genders, ages = map_handle_gt()
+# load handles from wiki data
+remainHandles = get_remain_handles("/home/yaguang/new_nonstop_onefeaturesword1.csv")
+onlyfiles = [handle+".csv" for handle in remainHandles]
 input_dim = 512
 batch_size = 32
+rocs = []
 
-# regularization term
-lam = 0.1
-
-# imdb
-genders_imdb, ages_imdb = imdb_map_handle_gt()
-genders_wiki, ages_wiki = map_handle_gt()
-
-# define the demographic to infer and the file for regularization
-if inference_type == InferenceType.age:
-    gt_imdb = ages_imdb
-    gt_wiki = ages_wiki
-    if bin_type == BinType.two:
-        pretrained = "saved_model/age/age2_trained_model"
-        tl_file = "age2_tl_handles.csv"
-    elif bin_type == BinType.three:
-        pretrained = "saved_model/age/age3_trained_model"
-        tl_file = "age3_tl_handles.csv"
-    elif bin_type == BinType.four:
-        pretrained = "saved_model/age/age4_trained_model"
-        tl_file = "age4_tl_handles.csv"
-else:
-    gt_imdb = genders_imdb
-    gt_wiki = genders_wiki
-    pretrained = "saved_model/gender/gender_trained_model"
-    tl_file = "gender_tl_handles.csv"
-
-
-index_imdb, labels_imdb, index_to_file_label_imdb = get_index_labels("/home/yaguang/imdb_lines.csv", gt_imdb)
-index_wiki, labels_wiki, index_to_file_label_wiki = get_index_labels("/home/yaguang/tl/samples_gen/"+tl_file, gt_wiki)
+index_to_file_label = map_index_to_file_label(onlyfiles)
+counter = [0, 0, 0, 0]
+index, labels = get_index_label(index_to_file_label)
+for label in labels:
+    counter[label] += 1
+print (counter)
+usecols = list(np.arange(1,769))
+counter = [0, 0, 0, 0]
+# undersample data
+index, labels = under_sample(index.reshape(-1, 1), labels)
+index = index.ravel()
+for label in labels:
+    counter[label] += 1
+print (counter)
 
 skf = StratifiedKFold(n_splits=10, shuffle=True)
 learning_rate = 0.0001
 
-
-skf_imdb = skf.split(index_imdb, labels_imdb)
-skf_wiki = skf.split(index_wiki, labels_wiki)
 fold = 0
-while fold < 10:
-    train_index, test_index = next(skf_imdb)
-    imdb_train_names, imdb_test_names, imdb_val_names = get_train_test_val_names(index_imdb, labels_imdb, index_to_file_label_imdb, train_index, test_index)
-    train_index, test_index = next(skf_wiki)
-    wiki_train_names, wiki_test_names, wiki_val_names = get_train_test_val_names(index_wiki, labels_wiki, index_to_file_label_wiki, train_index, test_index)
-    model = torch.load(pretrained, device)
+for train_index, test_index in skf.split(index, labels):
+    X_train_index, X_test_index = index[train_index], index[test_index]
+    y_train, y_test = labels[train_index], labels[test_index]
+    X_train_index, X_val_index, y_train, y_val = train_test_split(X_train_index, y_train, test_size=0.2, stratify=y_train, shuffle=True)
+    y_train = to_float_cuda(y_train, device)
+    y_test = to_float_cuda(y_test, device)
+    y_val = to_float_cuda(y_val, device)
+    X_train_names = []
+    X_test_names = []
+    X_val_names = []
+    for idx in X_train_index:
+        X_train_names.append(index_to_file_label[idx][0])
+    for idx in X_test_index:
+        X_test_names.append(index_to_file_label[idx][0])
+    for idx in X_val_index:
+        X_val_names.append(index_to_file_label[idx][0])
+    model = SeqAttention(input_dim, int(input_dim/2/2), D_out, int(input_dim/2), bin_classification, True)
     to_cuda(model, device)
-    train_model(model, imdb_train_names, imdb_test_names, imdb_val_names, wiki_train_names, wiki_test_names, wiki_val_names)
+    train_model(model, X_train_names, X_test_names, X_val_names)
     fold += 1
     print ("another epoch")
