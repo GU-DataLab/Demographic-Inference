@@ -283,7 +283,7 @@ def get_train_test_val_names(index, labels, index_to_file_label, train_index, te
         X_val_names.append(index_to_file_label[idx][0])
     return X_train_names, X_test_names, X_val_names
 
-
+# load embeddings
 env_imdb = lmdb.open('/data/lmdb/clip_imdb_3200/')
 env_wiki = lmdb.open('/data/lmdb/clip_text_3200/')
 txn_imdb = env_imdb.begin(write=False)
