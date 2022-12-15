@@ -1,7 +1,4 @@
-import sys
-sys.path.append("../")
 import random
-import lmdb
 import time
 import pickle
 import torch
@@ -21,7 +18,6 @@ from torch.nn.utils.rnn import pad_sequence
 from helper import SeqAttention, check_early
 from helper import map_handle_gt
 from helper import to_cuda, to_float_cuda, to_self_cuda, under_sample, get_files_under_dir
-from text_char_processing import get_tweet_texts
 import os
 import argparse, sys
 
@@ -98,7 +94,7 @@ def get_index_label(index_to_file_label):
     return index, labels
 
 # get training data and label information
-def get_train_label(batch_train_names, txn, att, idx):
+def get_train_label(batch_train_names, txn, att):
     X_batch_train = []
     y_batch_train = []
     y_gt = []
@@ -106,9 +102,7 @@ def get_train_label(batch_train_names, txn, att, idx):
     counter = [0, 0, 0 ,0]
     for i in range(len(batch_train_names)):
         handle = batch_train_names[i][:-4].lower()
-        pick_emd = txn.get(handle.encode())
-        temp = pickle.loads(pick_emd)[:fix_seq_len]
-        tweet_emb = [val[idx:] for val in temp]
+        tweet_emb = pick_emd = txn[handle]
         seq_lens.append(len(tweet_emb))
         while len(tweet_emb) < fix_seq_len:
             tweet_emb.append([0 for i in range(input_dim)])
@@ -151,10 +145,10 @@ def train_model(model, imdb_train_names, imdb_test_names, imdb_val_names, wiki_t
             model.train()
 
             imdb_batch_train_names = imdb_train_names[idx:idx+batch_size]
-            imdb_X_batch_train, imdb_y_batch_train, imdb_y_gt, imdb_seq_lens = get_train_label(imdb_batch_train_names, txn_imdb, gt_imdb, 1)
+            imdb_X_batch_train, imdb_y_batch_train, imdb_y_gt, imdb_seq_lens = get_train_label(imdb_batch_train_names, txn_imdb, gt_imdb)
 
             wiki_batch_train_names = wiki_train_names[idx:idx+batch_size]
-            wiki_X_batch_train, wiki_y_batch_train, wiki_y_gt, wiki_seq_lens = get_train_label(wiki_batch_train_names, txn_wiki, gt_wiki, 2)
+            wiki_X_batch_train, wiki_y_batch_train, wiki_y_gt, wiki_seq_lens = get_train_label(wiki_batch_train_names, txn_wiki, gt_wiki)
 
             y_pred = model(None, imdb_X_batch_train, imdb_seq_lens)
             imdb_loss = loss_fn(y_pred, imdb_y_batch_train)
@@ -198,14 +192,14 @@ def eval_model(model, imdb_test_names, wiki_test_names, is_eval=False):
         total = 0
         while idx < len(imdb_test_names):
             imdb_batch_test_names = imdb_test_names[idx:idx+batch_size]
-            imdb_X_batch_test, imdb_y_eval_test, imdb_y_gt, imdb_seq_lens = get_train_label(imdb_batch_test_names, txn_imdb, gt_imdb, 1)
+            imdb_X_batch_test, imdb_y_eval_test, imdb_y_gt, imdb_seq_lens = get_train_label(imdb_batch_test_names, txn_imdb, gt_imdb)
             y_test += imdb_y_gt
             imdb_y_hat_test = model(None, imdb_X_batch_test, imdb_seq_lens)
             imdb_loss = loss_fn(imdb_y_hat_test, imdb_y_eval_test)
 
             if is_eval:
                 wiki_batch_test_names = wiki_test_names[idx:idx+batch_size]
-                wiki_X_batch_test, wiki_y_eval_test, wiki_y_gt, wiki_seq_lens = get_train_label(wiki_batch_test_names, txn_wiki, gt_wiki, 2)
+                wiki_X_batch_test, wiki_y_eval_test, wiki_y_gt, wiki_seq_lens = get_train_label(wiki_batch_test_names, txn_wiki, gt_wiki)
                 wiki_y_hat_test = model(None, wiki_X_batch_test, wiki_seq_lens)
                 wiki_loss = loss_fn(wiki_y_hat_test, wiki_y_eval_test)
                 loss = sum([imdb_loss, lam*wiki_loss])
@@ -218,7 +212,6 @@ def eval_model(model, imdb_test_names, wiki_test_names, is_eval=False):
     if not is_eval:
         print ("total test loss is "+str(total))
         print ("test f1 is "+str(f1))
-        print (",".join([name[:-4] for name in imdb_test_names]))
         print (",".join([str(val) for val in y_test]))
         print (",".join([str(val) for val in y_hat_test_class]))
     else:
@@ -252,8 +245,8 @@ def get_filenames(path):
     return filenames
 
 # get index for cross validation
-def get_index_labels(path, att):
-    onlyfiles = get_filenames(path)
+def get_index_labels(handles, att):
+    onlyfiles = [handle+".csv" for handle in handles]
     index_to_file_label = map_index_to_file_label(onlyfiles, att)
     counter = [0, 0, 0, 0]
     index, labels = get_index_label(index_to_file_label)
@@ -284,11 +277,23 @@ def get_train_test_val_names(index, labels, index_to_file_label, train_index, te
     return X_train_names, X_test_names, X_val_names
 
 # load embeddings
-env_imdb = lmdb.open('/data/lmdb/clip_imdb_3200/')
-env_wiki = lmdb.open('/data/lmdb/clip_text_3200/')
-txn_imdb = env_imdb.begin(write=False)
-txn_wiki = env_wiki.begin(write=False)
+# load embeddings
+def load_data(foldername):
+    txn = {}
+    filenames = get_files_under_dir(foldername)
+    for filename in filenames:
+        f = open(foldername+filename)
+        emds = []
+        handle = filename.split(".")[0]
+        for line in f:
+            info = line.strip().split(",")
+            emds.append([float(val) for val in info[1:]])
+        txn[handle] = emds
+        f.close()
+    return txn
 
+txn_wiki = load_data("embeddings/")
+txn_imdb = load_data("imdb_embeddings/")
 
 if inference_type == InferenceType.gender:
     map_attribute = map_gender_to_label
@@ -315,31 +320,31 @@ batch_size = 32
 lam = 0.1
 
 # imdb
-genders_imdb, ages_imdb = imdb_map_handle_gt()
-genders_wiki, ages_wiki = map_handle_gt()
+genders_imdb, ages_imdb = map_handle_gt("imdb_gt.csv")
+genders_wiki, ages_wiki = map_handle_gt("gt.csv")
 
-# define the demographic to infer and the file for regularization
+# define the demographic to infer and the sample data for regularization
 if inference_type == InferenceType.age:
     gt_imdb = ages_imdb
     gt_wiki = ages_wiki
     if bin_type == BinType.two:
-        pretrained = "saved_model/age/age2_trained_model"
-        tl_file = "age2_tl_handles.csv"
+        pretrained = ""
+        tl_file = ""
     elif bin_type == BinType.three:
-        pretrained = "saved_model/age/age3_trained_model"
-        tl_file = "age3_tl_handles.csv"
+        pretrained = ""
+        tl_file = ""
     elif bin_type == BinType.four:
-        pretrained = "saved_model/age/age4_trained_model"
-        tl_file = "age4_tl_handles.csv"
+        pretrained = ""
+        tl_file = ""
 else:
     gt_imdb = genders_imdb
     gt_wiki = genders_wiki
-    pretrained = "saved_model/gender/gender_trained_model"
+    pretrained = "model/model"
     tl_file = "gender_tl_handles.csv"
 
 
-index_imdb, labels_imdb, index_to_file_label_imdb = get_index_labels("/home/yaguang/imdb_lines.csv", gt_imdb)
-index_wiki, labels_wiki, index_to_file_label_wiki = get_index_labels("/home/yaguang/tl/samples_gen/"+tl_file, gt_wiki)
+index_imdb, labels_imdb, index_to_file_label_imdb = get_index_labels(list(genders_imdb.keys()), gt_imdb)
+index_wiki, labels_wiki, index_to_file_label_wiki = get_index_labels(list(genders_wiki.keys()), gt_wiki)
 
 skf = StratifiedKFold(n_splits=10, shuffle=True)
 learning_rate = 0.0001
@@ -357,4 +362,4 @@ while fold < 10:
     to_cuda(model, device)
     train_model(model, imdb_train_names, imdb_test_names, imdb_val_names, wiki_train_names, wiki_test_names, wiki_val_names)
     fold += 1
-    print ("another epoch")
+    break

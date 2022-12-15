@@ -19,6 +19,7 @@ device = torch.device(dev) if torch.cuda.is_available() else None
 
 rus = RandomUnderSampler()
 
+# early stopping
 def check_early(vals_early, flag=8):
     for i in range(len(vals_early)):
         count = 0
@@ -28,16 +29,6 @@ def check_early(vals_early, flag=8):
         if count == flag:
             return i
     return None
-
-def get_remain_handles(path="/home/yaguang/new_nonstop_onefeaturesword1.csv", sep = "\x1b"):
-    f = open(path)
-    f.readline()
-    handles = set()
-    for line in f:
-        line = line.strip()
-        handle = line.split(sep)[0]
-        handles.add(handle)
-    return handles
 
 class MyMLP(nn.Module):
     def __init__(self, D_in, H, D_out, bin_label=False):
@@ -193,49 +184,14 @@ def to_self_cuda(d, device):
 def to_float_cuda(d, device):
     return torch.tensor(d).float().to(device)
 
-def map_imdb_handle_gt():
-    ages = {}
-    genders = {}
-    f = open("/home/yaguang/imdb/age_ground_truth.csv")
-    f.readline()
-    for line in f:
-        info = line.strip().split(",")
-        name,age,gender,handle,verified = info
-        handle = handle.lower()
-        age = int(age)
-        ages[handle] = age
-        genders[handle] = gender
-    f.close()
-    return genders, ages
-
 # wiki data from https://portals.mdi.georgetown.edu/public/demographic-inference
-def map_handle_gt(filename="/home/yaguang/query_race_attributes.csv"):
+def map_handle_gt(filename="gt.csv"):
     genders = {}
     ages = {}
-    handle2year = get_handle2year("/home/yaguang/handle2year.csv")
     f = open(filename)
     for line in f:
-        info = line.strip().split("\x1b")
-        handle, gender, age, race = info[1].lower(), info[2].lower(), info[3].lower(), info[-1].lower()
-        if gender:
-            genders[handle] = gender
-        if age:
-            ages[handle] = 2022-int(age.split("-")[0])
-            if handle in handle2year:
-                ages[handle] = handle2year[handle]-int(age.split("-")[0])
-    f.close()
-    f = open("/home/yaguang/query_attributes.csv")
-    for line in f:
-        info = line.strip().split("\x1b")
-        handle, gender, age, race = info[1].lower(), info[2].lower(), info[3].lower(), info[-1].lower()
-        if age and (handle not in ages):
-            ages[handle] = 2020-int(age.split("-")[0])
-            if handle in handle2year:
-                ages[handle] = handle2year[handle]-int(age.split("-")[0])
-        if gender and handle not in genders:
-            genders[handle] = gender
-    f.close()
-
+        name, gender = line.strip().split(",")
+        genders[name] = gender
     return genders, ages
 
 def get_handle2year(filename):

@@ -1,9 +1,7 @@
 import sys
 sys.path.append("../")
 import random
-import lmdb
 import time
-import pickle
 import torch
 import numpy as np
 import torch.nn as nn
@@ -18,7 +16,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_sequence
 from helper import SeqAttention, check_early
-from helper import to_cuda, to_float_cuda, to_self_cuda, under_sample, get_remain_handles, map_handle_gt, get_files_under_dir
+from helper import to_cuda, to_float_cuda, to_self_cuda, under_sample, map_handle_gt, get_files_under_dir
 import os
 import argparse, sys
 
@@ -122,9 +120,8 @@ def train_model(model, train_names, test_names, val_names):
             end_time = time.time()
             for i in range(len(batch_train_names)):
                 handle = batch_train_names[i][:-4].lower()
-                pick_emd = txn.get(handle.encode())
-                temp = pickle.loads(pick_emd)[:fix_seq_len]
-                tweet_emb = [val[2:] for val in temp]
+                pick_emd = txn[handle]
+                tweet_emb = pick_emd[:fix_seq_len]
                 seq_lens.append(len(tweet_emb))
                 while len(tweet_emb) < fix_seq_len:
                     tweet_emb.append([0 for i in range(input_dim)])
@@ -142,7 +139,7 @@ def train_model(model, train_names, test_names, val_names):
             optimizer.zero_grad()
             idx += batch_size
             total += loss.item()
-        #torch.save(model, "saved_model/"+inference_type+"/"+str(total))
+        torch.save(model, "model"+"/"+str(total))
         print ("total train loss is "+str(total))
         print ("print the loss and f1 for eval data")
         f1, loss_val = eval_model(model, val_names)
@@ -173,12 +170,9 @@ def eval_model(model, test_names):
             seq_lens = []
             for i in range(len(batch_test_names)):
                 handle = batch_test_names[i][:-4].lower()
-                pick_emd = txn.get(handle.encode())
-                temp =  pickle.loads(pick_emd)[:fix_seq_len]
-                #tweet_emb = pickle.loads(txn.get(handle.encode()))[:fix_seq_len]
-                tweet_emb = [val[2:] for val in temp]
+                pick_emd = txn[handle]
+                tweet_emb = pick_emd[:fix_seq_len]
                 seq_lens.append(len(tweet_emb))
-                dates = [val[0] for val in temp][::-1]
                 while len(tweet_emb) < fix_seq_len:
                     tweet_emb.append([0 for i in range(input_dim)])
                 X_batch_test.append(tweet_emb)
@@ -207,10 +201,22 @@ def eval_model(model, test_names):
     f1 = f1_score(y_test, y_hat_test_class, average='macro')
     return f1, total
 
-
 # load embeddings
-env = lmdb.open('/data/lmdb/clip_text_3200/')
-txn = env.begin(write=False)
+def load_data(foldername):
+    txn = {}
+    filenames = get_files_under_dir(foldername)
+    for filename in filenames:
+        f = open(foldername+filename)
+        emds = []
+        handle = filename.split(".")[0]
+        for line in f:
+            info = line.strip().split(",")
+            emds.append([float(val) for val in info[1:]])
+        txn[handle] = emds
+        f.close()
+    return txn
+
+txn = load_data("embeddings/")
 
 if inference_type == InferenceType.gender:
     map_attribute = map_gender_to_label
@@ -233,8 +239,7 @@ bin_classification = True if inference_type == InferenceType.gender else False
 
 genders, ages = map_handle_gt()
 # load handles from wiki data
-remainHandles = get_remain_handles("/home/yaguang/new_nonstop_onefeaturesword1.csv")
-onlyfiles = [handle+".csv" for handle in remainHandles]
+onlyfiles = [handle+".csv" for handle in genders]
 input_dim = 512
 batch_size = 32
 rocs = []
@@ -278,4 +283,4 @@ for train_index, test_index in skf.split(index, labels):
     to_cuda(model, device)
     train_model(model, X_train_names, X_test_names, X_val_names)
     fold += 1
-    print ("another epoch")
+    break
