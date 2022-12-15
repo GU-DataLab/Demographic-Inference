@@ -5,13 +5,13 @@ Usage
 
 2. We use some dummy examples here to help you start. This includes  
 	* a random generated IMDB dataset
-		imdb_gt.csv -- IMDB ground truth with fake username and gender
-		imdb_embeddings -- the embeddings for each user from the IMDB dataset
+		* imdb_gt.csv -- IMDB ground truth with fake username and gender
+		* imdb_embeddings -- the embeddings for each user from the IMDB dataset
 	*  a random generated Wiki dataset
-		gt.csv -- wiki ground truth with fake username and gender
-		wiki_embeddings -- the embeddings for each user from the IMDB dataset
+		* gt.csv -- wiki ground truth with fake username and gender
+		* wiki_embeddings -- the embeddings for each user from the IMDB dataset
 	*  a random generate model
-		under the directory model/model
+		* under the directory model/model
 		
 3. classifier.py  
 	--- Python script to train a model from scratch.  
