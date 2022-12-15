@@ -3,7 +3,7 @@ This repo contains the code for DITL.
 Usage
 1. To run the code, you need to download the Wiki data from https://portals.mdi.georgetown.edu/public/demographic-inference  
 
-2. We use some dummy examples here to help you start. This includes:-
+2. We use some dummy examples here to help you start. This includes<br />
 	a random generated IMDB dataset  
 		imdb_gt.csv -- IMDB ground truth with fake username and gender
 		imdb_embeddings -- the embeddings for each user from the IMDB dataset
