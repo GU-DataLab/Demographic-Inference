@@ -1,6 +1,6 @@
-This repo is largely based on otdd by Alvarez-Melis el al. (https://github.com/microsoft/otdd)
+This repo is based on Optimal Transport Dataset Distance ([otdd](https://github.com/microsoft/otdd)) by Alvarez-Melis el al.
 
-# Optimal Transport Dataset Distance (OTDD)
+# User-level OTDD
 
 ## Getting Started
 
