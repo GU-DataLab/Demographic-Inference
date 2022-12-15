@@ -23,7 +23,7 @@ Usage
 		fix_seq_len: number of posts to use
 	--- To run the dummy example, execute 
 		python classifier.py --inference_type gender --bin_type three --epoch 100 --fix_seq_len 200
-3. classfier_reg.py  
+4. classfier_reg.py  
 	--- Python script to train a model with regularization  
 	--- Command: python classifier.py --inference_type age --bin_type three --epoch 100 --fix_seq_len 200  
 	--- inference_type
