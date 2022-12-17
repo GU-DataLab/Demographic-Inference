@@ -6,16 +6,9 @@ This repo is based on Optimal Transport Dataset Distance ([otdd](https://github.
 
 ### Installation
 
-**Note**: It is highly recommended that the following be done inside a virtual environment
-
-
-#### Via Conda (recommended)
-
-If you use [ana|mini]conda , you can simply do:
-
 ```
 conda env create -f environment.yaml python=3.8
-conda activate otdd
+conda activate demographic_inference
 conda install .
 ```
 

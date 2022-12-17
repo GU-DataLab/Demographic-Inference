@@ -1,7 +1,7 @@
 
 pandas
 scikit-learn
-
+imblearn
 numpy
 scipy
 matplotlib
