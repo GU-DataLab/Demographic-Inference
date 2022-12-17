@@ -31,10 +31,7 @@ Usage
 	* Python script to train a model with **regularization**  
 	* Command: python classifier.py --inference_type age --bin_type three --epoch 5 --fix_seq_len 200  
 	* inference_type
-		* inference_type: gender/age
-		* bin_type: two/three/four, for age only
-		* epoch: number of epochs to run
-		* fix_seq_len: number of posts to use
+		* As above
 	* To run the dummy example, execute 
 		* python classifier_reg.py --inference_type gender --bin_type three --epoch 5 --fix_seq_len 200
 		
