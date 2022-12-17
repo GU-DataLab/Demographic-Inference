@@ -3,7 +3,7 @@ This repo contains the code for DITL.
 Usage
 1. To run the code, you need to 
 	* download the Wiki data from https://portals.mdi.georgetown.edu/public/demographic-inference  
-	* install librares
+	* install library
 	```
 	pip install imblearn
 	```
@@ -22,7 +22,7 @@ Usage
 	* Python script to train a model **from scratch**.  
 	* Command: python classifier.py --inference_type xxx --bin_type xxx --epoch xxx --fix_seq_len xxx
 	  	* inference_type: gender/age
-		* bin_type: two/three/four, for age only
+		* bin_type: for age, you can choose two/three/four. For gender, this attribute will be ignored whatever you type
 		* epoch: number of epochs to run
 		* fix_seq_len: number of posts to use
 	* To run the dummy example, execute 
