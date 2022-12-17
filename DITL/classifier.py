@@ -139,14 +139,13 @@ def train_model(model, train_names, test_names, val_names):
             optimizer.zero_grad()
             idx += batch_size
             total += loss.item()
-        torch.save(model, "model"+"/"+str(total))
-        print ("total train loss is "+str(total))
-        print ("print the loss and f1 for eval data")
         f1, loss_val = eval_model(model, val_names)
         vals_early.append(loss_val)
-        print ("eval f1 is "+str(f1))
         f1, loss_val = eval_model(model, test_names)
+        print("epoch "+str(epoch))
         print ("test f1 is "+str(f1))
+        torch.save(model, "model"+"/"+str(total))
+        print(1/0)
         print ("-------------")
         print ()
         if check_early(vals_early):
@@ -197,7 +196,6 @@ def eval_model(model, test_names):
                 for i in range(len(target)):
                     y_hat_test_class.append(target[i][0])
             idx += batch_size
-    print ("total eval loss is "+str(total))
     f1 = f1_score(y_test, y_hat_test_class, average='macro')
     return f1, total
 
@@ -216,7 +214,7 @@ def load_data(foldername):
         f.close()
     return txn
 
-txn = load_data("embeddings/")
+txn = load_data("wiki_embeddings/")
 
 if inference_type == InferenceType.gender:
     map_attribute = map_gender_to_label
@@ -242,7 +240,6 @@ genders, ages = map_handle_gt()
 onlyfiles = [handle+".csv" for handle in genders]
 input_dim = 512
 batch_size = 32
-rocs = []
 
 index_to_file_label = map_index_to_file_label(onlyfiles)
 counter = [0, 0, 0, 0]
@@ -259,7 +256,7 @@ for label in labels:
     counter[label] += 1
 print (counter)
 
-skf = StratifiedKFold(n_splits=10, shuffle=True)
+skf = StratifiedKFold(n_splits=5, shuffle=True)
 learning_rate = 0.0001
 
 fold = 0

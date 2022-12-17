@@ -10,7 +10,6 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import numpy as np
 from os import listdir
 from os.path import isfile, join
-import emoji
 import itertools
 import math
 import scipy.stats
@@ -185,13 +184,14 @@ def to_float_cuda(d, device):
     return torch.tensor(d).float().to(device)
 
 # wiki data from https://portals.mdi.georgetown.edu/public/demographic-inference
-def map_handle_gt(filename="gt.csv"):
+def map_handle_gt(filename="wiki_gt.csv"):
     genders = {}
     ages = {}
     f = open(filename)
     for line in f:
-        name, gender = line.strip().split(",")
+        name, gender, age = line.strip().split(",")
         genders[name] = gender
+        ages[name] = int(age)
     return genders, ages
 
 def get_handle2year(filename):

@@ -165,9 +165,8 @@ def train_model(model, imdb_train_names, imdb_test_names, imdb_val_names, wiki_t
             optimizer.zero_grad()
             idx += batch_size
             total += loss.item()
-        print ("total train loss is "+str(total))
+        print("epoch: "+str(epoch))
         f1 = f1_score(y_test, y_hat_test, average='macro')
-        print ("train f1 is "+str(f1))
         f1, loss_val = eval_model(model, imdb_val_names, wiki_val_names, True)
         vals_early.append(loss_val)
         f1, loss_val = eval_model(model, imdb_test_names, wiki_test_names)
@@ -210,13 +209,7 @@ def eval_model(model, imdb_test_names, wiki_test_names, is_eval=False):
             idx += batch_size
     f1 = f1_score(y_test, y_hat_test_class, average='macro')
     if not is_eval:
-        print ("total test loss is "+str(total))
         print ("test f1 is "+str(f1))
-        print (",".join([str(val) for val in y_test]))
-        print (",".join([str(val) for val in y_hat_test_class]))
-    else:
-        print ("total eval loss is "+str(total))
-        print ("eval f1 is "+str(f1))
     #auc = roc_auc_score(y_test, y_hat_test_class )
     return f1, total
 
@@ -277,7 +270,6 @@ def get_train_test_val_names(index, labels, index_to_file_label, train_index, te
     return X_train_names, X_test_names, X_val_names
 
 # load embeddings
-# load embeddings
 def load_data(foldername):
     txn = {}
     filenames = get_files_under_dir(foldername)
@@ -292,7 +284,7 @@ def load_data(foldername):
         f.close()
     return txn
 
-txn_wiki = load_data("embeddings/")
+txn_wiki = load_data("wiki_embeddings/")
 txn_imdb = load_data("imdb_embeddings/")
 
 if inference_type == InferenceType.gender:
@@ -316,31 +308,27 @@ bin_classification = True if inference_type == InferenceType.gender else False
 input_dim = 512
 batch_size = 32
 
-# regularization term
+# regularization weight
 lam = 0.1
 
 # imdb
 genders_imdb, ages_imdb = map_handle_gt("imdb_gt.csv")
-genders_wiki, ages_wiki = map_handle_gt("gt.csv")
+genders_wiki, ages_wiki = map_handle_gt("wiki_gt.csv")
 
 # define the demographic to infer and the sample data for regularization
 if inference_type == InferenceType.age:
     gt_imdb = ages_imdb
     gt_wiki = ages_wiki
     if bin_type == BinType.two:
-        pretrained = ""
-        tl_file = ""
+        pretrained = "model/age2_model"
     elif bin_type == BinType.three:
-        pretrained = ""
-        tl_file = ""
+        pretrained = "model/age3_model"
     elif bin_type == BinType.four:
-        pretrained = ""
-        tl_file = ""
+        pretrained = "model/age4_model"
 else:
     gt_imdb = genders_imdb
     gt_wiki = genders_wiki
-    pretrained = "model/model"
-    tl_file = "gender_tl_handles.csv"
+    pretrained = "model/gender_model"
 
 
 index_imdb, labels_imdb, index_to_file_label_imdb = get_index_labels(list(genders_imdb.keys()), gt_imdb)
