@@ -13,7 +13,6 @@ We propose two methods: DIDC and DITL.
 ```
 conda env create -f environment.yaml python=3.8
 conda activate demographic_inference
-conda install .
 ```
 
 Please refer to each folder for the source code and the detailed instructions on how to run the code.
