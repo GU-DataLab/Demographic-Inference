@@ -34,62 +34,9 @@ pip install .
 
 ## Usage Examples
 
-A vanilla example for OTDD (example.py):
+A vanilla example for OTDD (example.py)
 
-```python
-from otdd.pytorch.datasets import load_torchvision_data
-from otdd.pytorch.distance import DatasetDistance
-
-
-# Load datasets
-loaders_src = load_torchvision_data('MNIST', valid_size=0, resize = 28, maxsize=2000)[0]
-loaders_tgt = load_torchvision_data('USPS',  valid_size=0, resize = 28, maxsize=2000)[0]
-
-# Instantiate distance
-dist = DatasetDistance(loaders_src['train'], loaders_tgt['train'],
-                       inner_ot_method = 'exact',
-                       debiased_loss = True,
-                       p = 2, entreg = 1e-1,
-                       device='cpu')
-
-d = dist.distance(maxsamples = 1000)
-print(f'OTDD(src,tgt)={d}')
-
-```
-
-Toy example For Demographic Inference (example2.py):
-
-```python
-from otdd.pytorch.distance import DatasetDistance
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-
-class CustomDataset(Dataset):
-    def __init__(self):
-        # embedding space
-        self.embddings = np.array([[0.1, 0.2, 0.3], [0.2, 0.2, 0.4], [0.1, 0.1, 0.1], [0.2, 0.2, 0.5]])
-        self.targets = [0, 1, 0, 1]
-    def __len__(self):
-        return len(self.targets)
-    def __getitem__(self, idx):
-        emd = self.embddings[idx]
-        label = self.targets[idx]
-        return emd, label
-
-data = CustomDataset()
-wiki_loader = DataLoader(data,batch_size=64)
-
-data = CustomDataset()
-imdb_loader = DataLoader(data,batch_size=64)
-
-dist = DatasetDistance(wiki_loader, imdb_loader,
-                          inner_ot_method = 'exact',
-                          debiased_loss = True,
-                          p = 2, entreg = 1e-1)
-
-d = dist.distance()
-print(f'OTDD(MNIST,USPS)={d:8.2f}')
-```
+Toy example For Demographic Inference (example2.py)
 
 
 ## Acknowledgements
