@@ -26,15 +26,15 @@ Usage
 		* epoch: number of epochs to run
 		* fix_seq_len: number of posts to use
 	* To run the dummy example, execute 
-		* python classifier.py --inference_type gender --bin_type three --epoch 100 --fix_seq_len 200
+		* python classifier.py --inference_type gender --bin_type three --epoch 5 --fix_seq_len 200
 4. classfier_reg.py  
 	* Python script to train a model with **regularization**  
-	* Command: python classifier.py --inference_type age --bin_type three --epoch 100 --fix_seq_len 200  
+	* Command: python classifier.py --inference_type age --bin_type three --epoch 5 --fix_seq_len 200  
 	* inference_type
 		* inference_type: gender/age
 		* bin_type: two/three/four, for age only
 		* epoch: number of epochs to run
 		* fix_seq_len: number of posts to use
 	* To run the dummy example, execute 
-		* python classifier_reg.py --inference_type gender --bin_type three --epoch 100 --fix_seq_len 200
+		* python classifier_reg.py --inference_type gender --bin_type three --epoch 5 --fix_seq_len 200
 		
