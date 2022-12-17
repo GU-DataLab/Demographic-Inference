@@ -1,4 +1,4 @@
-name: otdd
+name: otdd_test
 channels:
   - pytorch
   - conda-forge

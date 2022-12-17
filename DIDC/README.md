@@ -34,7 +34,7 @@ pip install .
 
 ## Usage Examples
 
-A vanilla example for OTDD:
+A vanilla example for OTDD (example.py):
 
 ```python
 from otdd.pytorch.datasets import load_torchvision_data
@@ -57,7 +57,7 @@ print(f'OTDD(src,tgt)={d}')
 
 ```
 
-Toy example For Demographic Inference:
+Toy example For Demographic Inference (example2.py):
 
 ```python
 from otdd.pytorch.distance import DatasetDistance
