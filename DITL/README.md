@@ -4,9 +4,9 @@ Usage
 1. To run the code, you need to 
 	* download the Wiki data from https://portals.mdi.georgetown.edu/public/demographic-inference  
 	* install librares
-	**	```
-		pip install imblearn
-		```
+	```
+	pip install imblearn
+	```
 
 2. We use some dummy examples here to help you start. This includes
 	* a random generated IMDB dataset
