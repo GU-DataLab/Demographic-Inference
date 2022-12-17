@@ -144,8 +144,7 @@ def train_model(model, train_names, test_names, val_names):
         f1, loss_val = eval_model(model, test_names)
         print("epoch "+str(epoch))
         print ("test f1 is "+str(f1))
-        torch.save(model, "model"+"/"+str(total))
-        print(1/0)
+        #torch.save(model, "model"+"/"+str(total))
         print ("-------------")
         print ()
         if check_early(vals_early):
