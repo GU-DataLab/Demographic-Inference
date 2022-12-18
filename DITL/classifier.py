@@ -220,7 +220,7 @@ if inference_type == InferenceType.gender:
 elif inference_type == InferenceType.age:
     map_attribute = map_age_to_label
 else:
-    print ("error")
+    print ("------------ wrong type ------------")
 
 if bin_type == BinType.two:
     bins = [0, 45]
@@ -229,7 +229,7 @@ elif bin_type == BinType.three:
 elif bin_type == BinType.four:
     bins = [0, 30, 40, 50]
 else:
-    print (1/0)
+    print ("------------ wrong type ------------")
 
 D_out = len(bins) if inference_type == InferenceType.age else 1
 bin_classification = True if inference_type == InferenceType.gender else False
@@ -245,7 +245,7 @@ counter = [0, 0, 0, 0]
 index, labels = get_index_label(index_to_file_label)
 for label in labels:
     counter[label] += 1
-print (counter)
+
 usecols = list(np.arange(1,769))
 counter = [0, 0, 0, 0]
 # undersample data
@@ -253,7 +253,7 @@ index, labels = under_sample(index.reshape(-1, 1), labels)
 index = index.ravel()
 for label in labels:
     counter[label] += 1
-print (counter)
+
 
 skf = StratifiedKFold(n_splits=5, shuffle=True)
 learning_rate = 0.0001

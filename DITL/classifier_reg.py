@@ -292,7 +292,7 @@ if inference_type == InferenceType.gender:
 elif inference_type == InferenceType.age:
     map_attribute = map_age_to_label
 else:
-    print ("error")
+    print ("------------ wrong type ------------")
 
 if bin_type == BinType.two:
     bins = [0, 45]
@@ -301,7 +301,7 @@ elif bin_type == BinType.three:
 elif bin_type == BinType.four:
     bins = [0, 30, 40, 50]
 else:
-    print (1/0)
+    print ("------------ wrong type ------------")
 
 D_out = len(bins) if inference_type == InferenceType.age else 1
 bin_classification = True if inference_type == InferenceType.gender else False
