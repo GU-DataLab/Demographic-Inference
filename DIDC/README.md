@@ -2,34 +2,11 @@ This repo is based on Optimal Transport Dataset Distance ([otdd](https://github.
 
 # User-level OTDD
 
-## Getting Started
-
-### Installation
-
-```
-conda env create -f environment.yaml python=3.8
-conda activate demographic_inference
-conda install .
-```
-
-(you might need to install pytorch separately if you need a custom install)
-
-#### Via pip
-
-First install dependencies. Start by install pytorch with desired configuration using the instructions provided in the [pytorch website](https://pytorch.org/get-started/locally/). Then do:
-```
-pip install -r requirements.txt
-```
-Finally, install this package:
-```
-pip install .
-```
-
 ## Usage Examples
 
-A vanilla example for OTDD (example.py)
+A vanilla example for OTDD (python example.py)
 
-Toy example For Demographic Inference (example2.py)
+Toy example For Demographic Inference (python example2.py)
 
 
 ## Acknowledgements
