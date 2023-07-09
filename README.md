@@ -16,3 +16,5 @@ conda activate demographic_inference
 ```
 
 Please refer to each folder for the source code and the detailed instructions on how to run the code.
+
+By downloading this data, you agree that you are using the code/data for research purposes only.
