@@ -1,7 +1,7 @@
 Codebase for the paper: Combining vs Transferring Knowledge: Investigating Strategies for Improving Demographic Inference in Low Resource Settings
 
 ## Data
-The IMDB dataset for the evaluation tasks presented in our paper are in the dataset folder.
+The IMDB dataset for the evaluation tasks presented in our paper is here. https://portals.mdi.georgetown.edu/public/demographic-inference/demographic-inference-imdb
 
 ## Usage
 We propose two methods: DIDC and DITL.
